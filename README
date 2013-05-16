@@ -1,0 +1,8 @@
+(c) 2005-2006 jay kominek
+some free license is forthcoming
+
+scheme-parsergen.scm can be used to generate scheme-parsergen.scm
+from pegleg.peg
+
+peglib.scm is the library of parser combinators and various helper
+functions.

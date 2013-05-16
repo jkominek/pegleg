@@ -1,0 +1,92 @@
+Grammar <- Spacing Definition+ EndOfFile 
+        -> { (lambda (seq)
+               (let ( (definitions (cadr seq)) )
+                 `(grammar ,(caar definitions)
+                           ,definitions))) }
+Definition <- Identifier LEFTARROW Expression
+           -> { (lambda (seq)
+                  (list (string->symbol (car seq))
+                        (caddr seq))) }
+Expression <- Sequence ((SLASH Sequence)->{cadr})*
+           -> { (lambda (seq)
+                  (if (null? (cadr seq))
+                      (car seq)
+                      `(peg:choice ,@(cons (car seq) (cadr seq))))) }
+Sequence <- Prefix* (RIGHTARROW OPENCODE ((!CLOSECODE .)->{cadr})* CLOSECODE -> { caddr })?
+         -> { (lambda (seq)
+                (let* ( (lst (car seq))
+                        (codestr (list->string (cadr seq)))
+                        (code (read (open-input-string codestr)))
+                        (expr #f) )
+                  (begin
+                    (set! expr 
+                          (if (null? lst)
+                              '(peg:empty)
+                              (if (null? (cdr lst))
+                                  (car lst)
+                                  `(peg:sequence ,@lst))))
+                    (if (eof-object? code)
+                        expr
+                        (list '@ code expr))))) }
+Prefix <- ( AND -> { (fixed 'peg:and) }
+          / NOT -> { (fixed 'peg:not) } )? Suffix
+       -> { (lambda (seq)
+              (if (null? (car seq))
+                  (cadr seq)
+                  `(,(car seq) ,@(cdr seq)))) }
+Suffix <- Primary ( QUESTION -> { (fixed 'peg:optional) }
+                  / STAR -> { (fixed 'peg:kleene-star) }
+                  / PLUS -> { (fixed 'peg:kleene-plus) } )? 
+       -> { (lambda (seq)
+              (if (null? (cadr seq))
+                  (car seq)
+                  `(,(cadr seq) ,(car seq)))) }
+Primary <- Identifier !LEFTARROW -> { (lambda (seq) `(peg:nonterminal ,(string->symbol (car seq)))) }
+         / OPEN Expression CLOSE -> { cadr }
+         / Literal -> { (lambda (literal)
+                          `(peg:literal ,(list->string literal))) }
+         / Class
+         / DOT -> { (fixed '(peg:dot)) }
+
+Identifier <- IdentStart IdentCont* Spacing 
+           -> { (lambda (seq) (list->string (cons (car seq) (cadr seq)))) }
+IdentStart <- [a-zA-Z_] 
+IdentCont <- IdentStart / [0-9] 
+Literal <- ( ['] ((!['] Char)->{cadr})* ['] Spacing
+           / ["] ((!["] Char)->{cadr})* ["] Spacing ) -> { cadr }
+Class <- '[' ((!']' Range)->{cadr})* ']' Spacing
+      -> { (lambda (seq)
+             (let ((lst (cadr seq))) (if (null? (cdr lst))
+                                         (car lst)
+                                         (cons 'peg:choice lst)))) }
+Range <- Char '-' Char -> { (lambda (seq) `(peg:range ,(car seq) ,(caddr seq))) }
+       / Char -> { (lambda (chr) `(peg:character ,chr)) }
+Char <- '\\' [nrt'"\[\]\\] -> { (lambda (seq)
+                                  (case (cadr seq)
+                                    ((#\n) #\newline)
+                                    ((#\r) #\return)
+                                    ((#\t) #\tab)
+                                    (else (cadr seq)))) }
+      / ( '\\' [0-2][0-7][0-7] / '\\' [0-7][0-7]? ) -> { (lambda (seq)
+                                                           (integer->char (string->number (list->string (cdr seq))))) }
+      / !'\\' . -> { cadr }
+
+LEFTARROW <- '<-' Spacing 
+RIGHTARROW <- '->' Spacing
+SLASH <- '/' Spacing 
+AND <- '&' Spacing 
+NOT <- '!' Spacing 
+QUESTION <- '?' Spacing 
+STAR <- '*' Spacing 
+PLUS <- '+' Spacing 
+OPEN <- '(' Spacing 
+OPENCODE <- '{' Spacing
+CLOSE <- ')' Spacing
+CLOSECODE <- '}' Spacing
+COLON <- ':' Spacing
+DOT <- '.' Spacing 
+Spacing <- (Space / Comment)* 
+Comment <- '#' (!EndOfLine .)* EndOfLine 
+Space <- ' ' / '\t' / EndOfLine 
+EndOfLine <- '\r\n' / '\n' / '\r' 
+EndOfFile <- !. 
