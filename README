@@ -1,5 +1,5 @@
 (c) 2005-2006 jay kominek
-some free license is forthcoming
+ISC licensed. see attached file
 
 scheme-parsergen.scm can be used to generate scheme-parsergen.scm
 from pegleg.peg

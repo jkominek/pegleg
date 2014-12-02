@@ -1,5 +1,5 @@
 ; jay kominek, 2005
-; jkominek@miranda.org
+; kominek@gmail.com
 ; a part of pegleg
 ; yarrr!
 
